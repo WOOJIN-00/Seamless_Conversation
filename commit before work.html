@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서울 기온 관측 게시판</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EEF2F1;
+    --panel:#FFFFFF;
+    --ink:#1B2320;
+    --ink-soft:#5B675F;
+    --line:#D7DED9;
+    --teal:#0E7C86;
+    --teal-deep:#0A5E66;
+    --amber:#A9701A;
+    --amber-bg:#F6ECD8;
+    --brick:#A83E32;
+    --brick-bg:#F7E4DF;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --sans: 'IBM Plex Sans KR', -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.5;
+    padding:32px 16px 80px;
+  }
+  .board{max-width:760px;margin:0 auto;}
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    flex-wrap:wrap;
+    gap:8px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:16px;
+    margin-bottom:24px;
+  }
+  header h1{
+    font-size:20px;
+    font-weight:600;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  #clock{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:2px;
+    padding:20px 20px 22px;
+    margin-bottom:20px;
+  }
+  .panel h2{
+    font-size:14px;
+    font-weight:600;
+    margin:0 0 4px;
+    color:var(--ink);
+  }
+  .panel .sub{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin:0 0 16px;
+  }
+  button{
+    font-family:var(--sans);
+    font-size:13px;
+    font-weight:500;
+    border:1px solid var(--ink);
+    background:var(--ink);
+    color:var(--paper);
+    padding:9px 16px;
+    border-radius:2px;
+    cursor:pointer;
+  }
+  button:hover{background:var(--teal-deep);border-color:var(--teal-deep);}
+  button:disabled{opacity:0.5;cursor:progress;}
+  button.ghost{
+    background:transparent;
+    color:var(--ink);
+    border:1px solid var(--line);
+  }
+  button.ghost:hover{border-color:var(--ink);background:transparent;}
+
+  /* --- readout --- */
+  .readout{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    margin:18px 0 16px;
+    min-height:56px;
+  }
+  .readout .value{
+    font-family:var(--mono);
+    font-size:44px;
+    font-weight:600;
+    color:var(--teal-deep);
+  }
+  .readout .unit{
+    font-family:var(--mono);
+    font-size:18px;
+    color:var(--ink-soft);
+  }
+  .readout .placeholder{
+    font-family:var(--mono);
+    font-size:15px;
+    color:var(--ink-soft);
+  }
+  .meta-row{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px 18px;
+    font-size:12.5px;
+    margin-bottom:16px;
+  }
+  .meta-row div span.k{display:block;color:var(--ink-soft);margin-bottom:2px;}
+  .meta-row div span.v{font-family:var(--mono);word-break:break-all;}
+
+  /* --- verify grid --- */
+  .verify-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+    margin-top:14px;
+    font-size:11.5px;
+  }
+  .verify-grid .col{background:var(--panel);padding:10px 12px;}
+  .verify-grid .col h3{font-size:11.5px;margin:0 0 8px;color:var(--ink-soft);font-weight:600;}
+  .verify-grid pre{
+    font-family:var(--mono);
+    font-size:11px;
+    white-space:pre-wrap;
+    word-break:break-all;
+    margin:0;
+    max-height:220px;
+    overflow:auto;
+  }
+  .verify-grid.match .col{outline:1px solid transparent;}
+  .match-flag{
+    margin-top:10px;
+    font-size:12.5px;
+    font-family:var(--mono);
+    padding:6px 10px;
+    border-radius:2px;
+  }
+  .match-flag.ok{background:#E1F0EA;color:#1E6E4E;}
+  .match-flag.bad{background:var(--brick-bg);color:var(--brick);}
+
+  .rowcount{
+    margin-top:14px;
+    font-size:12.5px;
+    font-family:var(--mono);
+    color:var(--ink-soft);
+  }
+
+  /* --- table --- */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px;}
+  th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{color:var(--ink-soft);font-weight:600;font-size:11.5px;}
+  td.num{font-family:var(--mono);}
+  td.url{font-family:var(--mono);font-size:10.5px;word-break:break-all;color:var(--ink-soft);}
+  .empty-note{font-size:12.5px;color:var(--ink-soft);padding:12px 0;}
+
+  .change-calc{
+    margin-top:14px;
+    padding:12px 14px;
+    background:#F2F7F6;
+    border:1px solid var(--line);
+    font-family:var(--mono);
+    font-size:13px;
+  }
+
+  /* --- failure panel --- */
+  .badge{
+    display:inline-block;
+    font-size:11.5px;
+    font-family:var(--mono);
+    padding:4px 9px;
+    border-radius:2px;
+    margin-bottom:14px;
+  }
+  .badge.synthetic{background:var(--amber-bg);color:var(--amber);}
+  .fail-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+  .fail-buttons button{font-size:12.5px;padding:8px 12px;}
+  .status-card{
+    border:1px solid var(--line);
+    padding:14px 16px;
+    font-size:13px;
+  }
+  .status-card.fresh{border-left:3px solid var(--teal);}
+  .status-card.loading{border-left:3px solid var(--ink-soft);}
+  .status-card.stale{border-left:3px solid var(--brick);}
+  .status-row{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;}
+  .status-row .k{color:var(--ink-soft);}
+  .status-row .v{font-family:var(--mono);}
+  .stale-tag{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:10.5px;
+    background:var(--brick-bg);
+    color:var(--brick);
+    padding:2px 6px;
+    border-radius:2px;
+    margin-left:6px;
+  }
+  .action-row{display:flex;gap:8px;margin-top:10px;}
+  .synthetic-log{margin-top:12px;font-size:12px;font-family:var(--mono);color:var(--ink-soft);}
+
+  /* --- secret scan panel --- */
+  .scan-line{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    font-size:12.5px;
+    padding:8px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .scan-line:last-child{border-bottom:none;}
+  .scan-line .result{font-family:var(--mono);font-weight:600;}
+  .scan-line .result.pass{color:#1E6E4E;}
+  .scan-line .result.fail{color:var(--brick);}
+  pre.code-block{
+    background:#F5F7F5;
+    border:1px solid var(--line);
+    padding:12px 14px;
+    font-family:var(--mono);
+    font-size:11.5px;
+    overflow-x:auto;
+    margin:0 0 14px;
+  }
+
+  @media (prefers-reduced-motion: no-preference){
+    .flash{animation:flash 0.6s ease;}
+    @keyframes flash{ from{background:#E1F0EA;} to{background:var(--panel);} }
+  }
+</style>
+</head>
+<body>
+<div class="board">
+
+  <header>
+    <h1>서울 기온 관측 게시판</h1>
+    <div id="clock">—</div>
+  </header>
+
+  <!-- 1. 실시간 조회 -->
+  <section class="panel" id="livePanel">
+    <h2>1. 실시간 조회</h2>
+    <p class="sub">출처: Open-Meteo Forecast API · 비밀키 불필요 · 기준 시간대 Asia/Seoul</p>
+    <button id="fetchBtn">지금 조회하기</button>
+
+    <div class="readout" id="readout">
+      <span class="placeholder">아직 조회하지 않았습니다.</span>
+    </div>
+
+    <div class="meta-row" id="metaRow" style="display:none;">
+      <div><span class="k">출처</span><span class="v" id="metaSource"></span></div>
+      <div><span class="k">출처 시각</span><span class="v" id="metaSourceTime"></span></div>
+      <div><span class="k">조회 시각</span><span class="v" id="metaFetchTime"></span></div>
+      <div><span class="k">기준 시간대</span><span class="v" id="metaTz"></span></div>
+    </div>
+
+    <div id="verifySection" style="display:none;">
+      <div class="verify-grid" id="verifyGrid">
+        <div class="col"><h3>① 원자료 (API 응답)</h3><pre id="rawBox"></pre></div>
+        <div class="col"><h3>② 저장값 (localStorage)</h3><pre id="storedBox"></pre></div>
+        <div class="col"><h3>③ 화면값 (표시된 값)</h3><pre id="screenBox"></pre></div>
+      </div>
+      <div class="match-flag" id="matchFlag"></div>
+    </div>
+
+    <div class="rowcount" id="rowCountInfo"></div>
+  </section>
+
+  <!-- 2. 일별 기록 + 변화 재계산 -->
+  <section class="panel" id="tablePanel">
+    <h2>2. 일별 기록 &amp; 어제 대비 변화 재계산</h2>
+    <p class="sub">기준 시간대(Asia/Seoul)의 날짜를 키로 하루 한 건만 저장됩니다.</p>
+    <div id="tableWrap"><p class="empty-note">아직 저장된 기록이 없습니다.</p></div>
+    <div id="changeCalcWrap"></div>
+    <div id="exportWrap" style="margin-top:16px;"></div>
+  </section>
+
+  <!-- 3. 실패 재생 (공식 fixture 기반) -->
+  <section class="panel" id="failurePanel">
+    <h2>3. 결정론 fixture 재생 시험</h2>
+    <span class="badge synthetic">공식 fixture(fixture-manifest.json, 해시 대조 완료) 재생 — 위 실제 기록과 분리되어 있으며 저장소에 남지 않음</span>
+    <p class="sub">adapter-reset.example.js와 같은 정규화·저장 규칙으로 9개 결정론 fixture를 재생합니다. 실제 API를 호출하지 않습니다.</p>
+
+    <p class="sub" style="margin-bottom:8px;"><strong>정상 순서</strong> (C20·C21): reset → T04-NORMAL-D1-A → T04-NORMAL-D1-B → T04-NORMAL-D2</p>
+    <div class="fail-buttons">
+      <button class="ghost" id="normalSeqBtn">정상 순서 재생</button>
+    </div>
+
+    <p class="sub" style="margin-bottom:8px;"><strong>실패 재생</strong> (C12~C19·C26): 각 버튼은 reset → D1-A → D1-B → 실패 fixture 순으로 재생합니다.</p>
+    <div class="fail-buttons">
+      <button class="ghost" data-fx="timeout">느린 응답 (T04-TIMEOUT)</button>
+      <button class="ghost" data-fx="auth">401/403 거절 (T04-AUTH-401)</button>
+      <button class="ghost" data-fx="rate">호출 제한 (T04-RATE-429)</button>
+      <button class="ghost" data-fx="offline">오프라인 (T04-OFFLINE)</button>
+      <button class="ghost" data-fx="schema">형식 변경 (T04-SCHEMA-BREAK)</button>
+    </div>
+
+    <div class="status-card fresh" id="statusCard">
+      <div class="status-row"><span class="k">상태 (freshness)</span><span class="v" id="synStatus">—</span></div>
+      <div class="status-row"><span class="k">error_code</span><span class="v" id="synErrorCode">—</span></div>
+      <div class="status-row"><span class="k">일별 기록 행 수</span><span class="v" id="synRowCount">—</span></div>
+      <div class="status-row"><span class="k">마지막 정상값</span><span class="v" id="synLastGood">—</span></div>
+      <div class="status-row"><span class="k">전일 대비 delta</span><span class="v" id="synDelta">—</span></div>
+      <div class="action-row">
+        <button class="ghost" id="retryBtn" disabled>다시 시도</button>
+        <button class="ghost" id="recoverBtn" disabled>복구 재생 (T04-RECOVER-D2)</button>
+      </div>
+      <div class="match-flag" id="expectMatch" style="margin-top:12px;"></div>
+    </div>
+    <div class="synthetic-log" id="synLog"></div>
+  </section>
+
+
+  <!-- 4. 비밀값 스캔 -->
+  <section class="panel" id="secretPanel">
+    <h2>4. 비밀값 스캔</h2>
+    <p class="sub">실제 호출 코드와 저장소 키를 그대로 노출해 비밀값 부재를 직접 확인할 수 있게 합니다.</p>
+    <pre class="code-block" id="fetchCodeBox"></pre>
+    <div id="scanResults"></div>
+  </section>
+
+</div>
+
+<script>
+const SOURCE_URL = "https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m&timezone=Asia%2FSeoul";
+
+// window.storage는 Claude 채팅 안 미리보기(Artifact) 전용 API라 실제 배포 사이트에는 없습니다.
+// 같은 모양(get/set/list)의 인터페이스를 localStorage로 직접 구현해 실제 배포 환경에서 동작하게 합니다.
+const appStorage = {
+  async get(key){
+    const raw = localStorage.getItem(key);
+    if(raw === null) throw new Error('키를 찾을 수 없습니다: ' + key);
+    return { key, value: raw };
+  },
+  async set(key, value){
+    localStorage.setItem(key, value);
+    return { key, value };
+  },
+  async delete(key){
+    localStorage.removeItem(key);
+    return { key, deleted: true };
+  },
+  async list(prefix = ''){
+    const keys = [];
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k !== null && k.startsWith(prefix)) keys.push(k);
+    }
+    return { keys };
+  }
+};
+
+function kstDateKey(d = new Date()){
+  return new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Seoul', year:'numeric', month:'2-digit', day:'2-digit' }).format(d);
+}
+function kstDateTime(d = new Date()){
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone:'Asia/Seoul', hour12:false,
+    year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit'
+  }).format(d) + ' KST';
+}
+
+// ---- clock ----
+function tickClock(){ document.getElementById('clock').textContent = kstDateTime(); }
+tickClock();
+setInterval(tickClock, 1000);
+
+// ================= 1. 실시간 조회 =================
+async function fetchLive(){
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  btn.textContent = '조회 중...';
+  try{
+    const res = await fetch(SOURCE_URL);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const raw = await res.json();
+
+    const record = {
+      sourceUrl: SOURCE_URL,
+      sourceTime: raw.current.time,
+      value: raw.current.temperature_2m,
+      unit: raw.current_units.temperature_2m,
+      fetchedAt: kstDateTime(),
+      fetchedAtISO: new Date().toISOString(),
+      timezone: 'Asia/Seoul'
+    };
+
+    const dateKey = kstDateKey();
+    const storageKey = 'daily:' + dateKey;
+
+    let beforeCount = 0;
+    try{
+      const before = await appStorage.list('daily:');
+      beforeCount = before ? before.keys.length : 0;
+    }catch(e){ beforeCount = 0; }
+
+    await appStorage.set(storageKey, JSON.stringify(record));
+
+    let afterCount = beforeCount;
+    try{
+      const after = await appStorage.list('daily:');
+      afterCount = after ? after.keys.length : beforeCount;
+    }catch(e){}
+
+    const storedRes = await appStorage.get(storageKey);
+    const storedRecord = JSON.parse(storedRes.value);
+
+    renderReadout(record);
+    renderVerify(raw.current, storedRecord, record);
+    renderRowCount(beforeCount, afterCount, dateKey);
+    await renderDailyTable();
+  }catch(e){
+    document.getElementById('readout').innerHTML =
+      '<span class="placeholder" style="color:var(--brick)">조회 실패: ' + e.message + '</span>';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '지금 조회하기';
+  }
+}
+
+function renderReadout(record){
+  const el = document.getElementById('readout');
+  el.classList.add('flash');
+  el.innerHTML =
+    '<span class="value">' + record.value + '</span><span class="unit">' + record.unit + '</span>';
+  setTimeout(() => el.classList.remove('flash'), 650);
+
+  document.getElementById('metaRow').style.display = 'grid';
+  document.getElementById('metaSource').textContent = record.sourceUrl;
+  document.getElementById('metaSourceTime').textContent = record.sourceTime;
+  document.getElementById('metaFetchTime').textContent = record.fetchedAt;
+  document.getElementById('metaTz').textContent = record.timezone;
+}
+
+function renderVerify(rawCurrent, storedRecord, screenRecord){
+  document.getElementById('verifySection').style.display = 'block';
+  document.getElementById('rawBox').textContent = JSON.stringify(rawCurrent, null, 2);
+  document.getElementById('storedBox').textContent = JSON.stringify(storedRecord, null, 2);
+  const screenView = {
+    value: screenRecord.value,
+    unit: screenRecord.unit,
+    source: screenRecord.sourceUrl,
+    sourceTime: screenRecord.sourceTime,
+    fetchedAt: screenRecord.fetchedAt,
+    timezone: screenRecord.timezone
+  };
+  document.getElementById('screenBox').textContent = JSON.stringify(screenView, null, 2);
+
+  const match =
+    rawCurrent.temperature_2m === storedRecord.value &&
+    storedRecord.value === screenRecord.value &&
+    rawCurrent.time === storedRecord.sourceTime;
+
+  const flag = document.getElementById('matchFlag');
+  flag.className = 'match-flag ' + (match ? 'ok' : 'bad');
+  flag.textContent = match
+    ? '일치: 원자료 · 저장값 · 화면값의 값과 출처 시각이 모두 같습니다.'
+    : '불일치가 감지되었습니다. 위 세 칸을 비교해 어느 단계에서 값이 달라졌는지 확인하세요.';
+}
+
+function renderRowCount(before, after, dateKey){
+  document.getElementById('rowCountInfo').textContent =
+    '재실행 전 일별 기록 수: ' + before + '건 → 재실행 후: ' + after + '건 (오늘 날짜 ' + dateKey + ' 기준, 같은 날 재실행이면 건수가 그대로여야 합니다)';
+}
+
+// ================= 2. 일별 기록 + 변화 재계산 =================
+async function renderDailyTable(){
+  const wrap = document.getElementById('tableWrap');
+  const calcWrap = document.getElementById('changeCalcWrap');
+  let keys = [];
+  try{
+    const listRes = await appStorage.list('daily:');
+    keys = listRes ? listRes.keys : [];
+  }catch(e){ keys = []; }
+
+  if(keys.length === 0){
+    wrap.innerHTML = '<p class="empty-note">아직 저장된 기록이 없습니다.</p>';
+    calcWrap.innerHTML = '';
+    return;
+  }
+
+  const records = [];
+  for(const k of keys){
+    try{
+      const r = await appStorage.get(k);
+      const rec = JSON.parse(r.value);
+      records.push({ date: k.replace('daily:', ''), ...rec });
+    }catch(e){}
+  }
+  records.sort((a,b) => a.date.localeCompare(b.date));
+
+  let rows = '';
+  for(const r of records){
+    rows += '<tr>' +
+      '<td class="num">' + r.date + '</td>' +
+      '<td class="num">' + r.value + ' ' + r.unit + '</td>' +
+      '<td class="url">' + r.sourceUrl + '</td>' +
+      '<td>' + r.sourceTime + '</td>' +
+      '<td>' + r.fetchedAt + '</td>' +
+      '</tr>';
+  }
+  wrap.innerHTML =
+    '<table><thead><tr><th>날짜(KST)</th><th>값</th><th>출처 URL</th><th>출처 시각</th><th>조회 시각</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+
+  if(records.length >= 2){
+    const prev = records[records.length - 2];
+    const curr = records[records.length - 1];
+    const diff = curr.value - prev.value;
+    const sign = diff >= 0 ? '+' : '';
+    calcWrap.innerHTML =
+      '<div class="change-calc">' +
+      curr.date + ' 값(' + curr.value + curr.unit + ') − ' + prev.date + ' 값(' + prev.value + prev.unit + ')' +
+      ' = ' + sign + diff.toFixed(1) + curr.unit +
+      '</div>';
+  }else{
+    calcWrap.innerHTML = '<p class="empty-note">서로 다른 날짜의 기록이 2건 이상 쌓이면 어제 대비 변화가 여기에 재계산되어 표시됩니다.</p>';
+  }
+
+  renderExportButton(records);
+}
+
+function renderExportButton(records){
+  const wrap = document.getElementById('exportWrap');
+  if(records.length < 2){
+    wrap.innerHTML = '<p class="empty-note">서로 다른 날짜의 기록이 2건 이상이어야 제출정보.json을 만들 수 있습니다.</p>';
+    return;
+  }
+  wrap.innerHTML = '<button id="exportBtn" class="ghost">제출정보.json 내보내기 (과정영수증 2건)</button>' +
+    '<div class="empty-note" id="exportNote" style="margin-top:8px;"></div>';
+  document.getElementById('exportBtn').addEventListener('click', () => exportSubmission(records));
+}
+
+function exportSubmission(records){
+  // 가장 이른 두 날짜를 과정영수증 2건으로 사용합니다 (canonical_kind: t04_day).
+  const chosen = records.slice(0, 2);
+  const receipts = chosen.map(r => ({
+    canonical_kind: 't04_day',
+    server_created_at: r.fetchedAtISO || new Date().toISOString(),
+    payload: {
+      source_url: r.sourceUrl,
+      source_observed_at: r.sourceTime,
+      normalized_value: r.value,
+      unit: r.unit
+    }
+  }));
+
+  const submission = { 과정영수증: receipts };
+  const blob = new Blob([JSON.stringify(submission, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '제출정보.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  const dates = chosen.map(r => r.date).join(', ');
+  document.getElementById('exportNote').textContent =
+    '내려받기 완료: 날짜 [' + dates + '] 기준 과정영수증 2건 포함';
+}
+
+// ================= 3. 결정론 fixture 재생 (adapter-reset.example.js 로직 이식) =================
+
+function fxClone(v){ return JSON.parse(JSON.stringify(v)); }
+
+function fxResetState(){
+  return {
+    daily_readings: [],
+    current_reading: null,
+    status: null,
+    last_delta: null,
+    last_comparison: { state:'insufficient', direction:null, magnitude:null, unit:null }
+  };
+}
+
+function fxRecordId(reading){ return 'demo-' + reading.signal_id + '-' + reading.record_date; }
+
+function fxComparisonFor(rows, current){
+  const previous = rows
+    .filter(r => r.signal_id === current.signal_id && r.record_date < current.record_date)
+    .sort((a,b) => b.record_date.localeCompare(a.record_date))[0];
+  if(!previous) return { state:'insufficient', direction:null, magnitude:null, unit:null };
+  if(previous.unit !== current.unit) return { state:'unit_mismatch', direction:null, magnitude:null, unit:null };
+  const signed = current.normalized_value - previous.normalized_value;
+  return { state:'comparable', direction: signed>0?'increase':signed<0?'decrease':'unchanged', magnitude: Math.abs(signed), unit: current.unit };
+}
+
+function fxApplySuccess(inputState, reading, fixtureId){
+  const state = fxClone(inputState);
+  const idx = state.daily_readings.findIndex(r => r.signal_id === reading.signal_id && r.record_date === reading.record_date);
+  const row = {
+    record_id: idx >= 0 ? state.daily_readings[idx].record_id : fxRecordId(reading),
+    signal_id: reading.signal_id,
+    record_date: reading.record_date,
+    normalized_value: reading.normalized_value,
+    unit: reading.unit
+  };
+  if(idx >= 0) state.daily_readings[idx] = row; else state.daily_readings.push(row);
+  state.daily_readings.sort((a,b) => a.record_date.localeCompare(b.record_date));
+  state.current_reading = fxClone(reading);
+  state.status = { freshness:'fresh', error_code:'none' };
+  state.last_comparison = fxComparisonFor(state.daily_readings, row);
+  state.last_delta = state.last_comparison.magnitude;
+  return state;
+}
+
+function fxApplyError(inputState, errorCode){
+  const state = fxClone(inputState);
+  state.status = { freshness:'stale', error_code: errorCode };
+  return state;
+}
+
+function fxRun(inputState, fixture){
+  if(fixture.transport.mode === 'timeout') return fxApplyError(inputState, 'timeout');
+  if(fixture.transport.mode === 'offline') return fxApplyError(inputState, 'offline');
+  if(fixture.transport.status === 401 || fixture.transport.status === 403) return fxApplyError(inputState, 'auth');
+  if(fixture.transport.status === 429) return fxApplyError(inputState, 'rate_limit');
+  if(fixture.transport.status >= 200 && fixture.transport.status < 300){
+    if(typeof fixture.payload.normalized_value !== 'number') return fxApplyError(inputState, 'schema_error');
+    return fxApplySuccess(inputState, fixture.payload, fixture.fixture_id);
+  }
+  return fxApplyError(inputState, 'schema_error');
+}
+
+// ---- 공식 fixture 9종 요약본 (asset-manifest.json 해시 대조 완료된 원본 payload 기준) ----
+const FX = {
+  D1A: { fixture_id:'T04-NORMAL-D1-A', transport:{mode:'http',status:200},
+    payload:{signal_id:'aleph-demo-index',normalized_value:100,unit:'pt',record_date:'2026-08-24'},
+    expected:{freshness:'fresh',error_code:'none',row_count:1,stored_value:100,delta:null} },
+  D1B: { fixture_id:'T04-NORMAL-D1-B', transport:{mode:'http',status:200},
+    payload:{signal_id:'aleph-demo-index',normalized_value:105,unit:'pt',record_date:'2026-08-24'},
+    expected:{freshness:'fresh',error_code:'none',row_count:1,stored_value:105,delta:null} },
+  D2: { fixture_id:'T04-NORMAL-D2', transport:{mode:'http',status:200},
+    payload:{signal_id:'aleph-demo-index',normalized_value:120,unit:'pt',record_date:'2026-08-25'},
+    expected:{freshness:'fresh',error_code:'none',row_count:2,stored_value:120,delta:15} },
+  TIMEOUT: { fixture_id:'T04-TIMEOUT', transport:{mode:'timeout',status:null}, payload:null,
+    expected:{freshness:'stale',error_code:'timeout',row_count:1,stored_value:105,delta:null} },
+  AUTH: { fixture_id:'T04-AUTH-401', transport:{mode:'http',status:401}, payload:{message:'unauthorized synthetic fixture'},
+    expected:{freshness:'stale',error_code:'auth',row_count:1,stored_value:105,delta:null} },
+  RATE: { fixture_id:'T04-RATE-429', transport:{mode:'http',status:429}, payload:{message:'rate limited synthetic fixture'},
+    expected:{freshness:'stale',error_code:'rate_limit',row_count:1,stored_value:105,delta:null} },
+  OFFLINE: { fixture_id:'T04-OFFLINE', transport:{mode:'offline',status:null}, payload:null,
+    expected:{freshness:'stale',error_code:'offline',row_count:1,stored_value:105,delta:null} },
+  SCHEMA: { fixture_id:'T04-SCHEMA-BREAK', transport:{mode:'http',status:200},
+    payload:{signal_id:'aleph-demo-index',normalized_value:'105',unit:'pt',record_date:'2026-08-24'},
+    expected:{freshness:'stale',error_code:'schema_error',row_count:1,stored_value:105,delta:null} },
+  RECOVER: { fixture_id:'T04-RECOVER-D2', transport:{mode:'http',status:200},
+    payload:{signal_id:'aleph-demo-index',normalized_value:120,unit:'pt',record_date:'2026-08-25'},
+    expected:{freshness:'fresh',error_code:'none',row_count:2,stored_value:120,delta:15} }
+};
+
+const FAILURE_MAP = { timeout:FX.TIMEOUT, auth:FX.AUTH, rate:FX.RATE, offline:FX.OFFLINE, schema:FX.SCHEMA };
+
+let replayLog = [];
+let currentReplayState = fxResetState();
+let lastFailureKey = null;
+
+function fxSleep(ms){ return new Promise(res => setTimeout(res, ms)); }
+
+function buildBaseline(){
+  let s = fxResetState();
+  s = fxRun(s, FX.D1A);
+  s = fxRun(s, FX.D1B);
+  return s;
+}
+
+function currentStoredValue(state){
+  if(state.daily_readings.length === 0) return null;
+  return state.daily_readings[state.daily_readings.length - 1].normalized_value;
+}
+
+function checkExpected(state, expected){
+  const stored = currentStoredValue(state);
+  const okFresh = state.status.freshness === expected.freshness;
+  const okCode = state.status.error_code === expected.error_code;
+  const okRows = state.daily_readings.length === expected.row_count;
+  const okValue = stored === expected.stored_value;
+  const okDelta = expected.delta === null
+    ? (state.last_delta === null || state.last_delta === undefined)
+    : (state.last_delta === expected.delta);
+  return okFresh && okCode && okRows && okValue && okDelta;
+}
+
+function lockButtons(disabled){
+  setButtonsDisabled(disabled);
+  document.getElementById('retryBtn').disabled = true;
+  document.getElementById('recoverBtn').disabled = true;
+}
+
+async function runNormalSequence(){
+  lockButtons(true);
+  let s = fxResetState();
+  s = fxRun(s, FX.D1A);
+  renderReplayState(s, 'T04-NORMAL-D1-A 재생 (새 행 1건 생성)');
+  await fxSleep(400);
+  s = fxRun(s, FX.D1B);
+  renderReplayState(s, 'T04-NORMAL-D1-B 재생 (같은 날짜 → 행 수 그대로 1건, C20)');
+  await fxSleep(400);
+  s = fxRun(s, FX.D2);
+  renderReplayState(s, 'T04-NORMAL-D2 재생 (다음 날짜 → 행 2건, delta +15, C21)');
+  showExpectedMatch(checkExpected(s, FX.D2.expected), FX.D2);
+  currentReplayState = s;
+  lastFailureKey = null;
+  setButtonsDisabled(false);
+}
+
+async function runFailure(key){
+  lastFailureKey = key;
+  lockButtons(true);
+  const fixture = FAILURE_MAP[key];
+  const baseline = buildBaseline();
+  renderReplayState(baseline, 'reset → D1-A → D1-B 재생 (기준선: fresh/none, 값 105)');
+  await fxSleep(fixture.transport.mode === 'timeout' ? 1200 : 400);
+  const s = fxRun(baseline, fixture);
+  renderReplayState(s, fixture.fixture_id + ' 재생');
+  showExpectedMatch(checkExpected(s, fixture.expected), fixture);
+  currentReplayState = s;
+  setButtonsDisabled(false);
+  document.getElementById('retryBtn').disabled = false;
+  document.getElementById('recoverBtn').disabled = false;
+}
+
+async function retryLast(){
+  if(lastFailureKey) await runFailure(lastFailureKey);
+}
+
+async function recoverD2(){
+  if(!currentReplayState.status || currentReplayState.status.freshness !== 'stale') return;
+  lockButtons(true);
+  await fxSleep(400);
+  const s = fxRun(currentReplayState, FX.RECOVER);
+  renderReplayState(s, 'T04-RECOVER-D2 재생 (다시 시도 성공 → 회복)');
+  showExpectedMatch(checkExpected(s, FX.RECOVER.expected), FX.RECOVER);
+  currentReplayState = s;
+  setButtonsDisabled(false);
+}
+
+function setButtonsDisabled(disabled){
+  document.querySelectorAll('#failurePanel .fail-buttons button').forEach(b => b.disabled = disabled);
+}
+
+function renderReplayState(state, logLabel){
+  const card = document.getElementById('statusCard');
+  const freshness = state.status ? state.status.freshness : '—';
+  const errorCode = state.status ? state.status.error_code : '—';
+  card.className = 'status-card ' + (freshness === 'stale' ? 'stale' : freshness === 'fresh' ? 'fresh' : 'loading');
+
+  document.getElementById('synStatus').textContent = freshness;
+  document.getElementById('synErrorCode').textContent = errorCode;
+  document.getElementById('synRowCount').textContent = state.daily_readings.length + '건';
+
+  const stored = currentStoredValue(state);
+  const lastRow = state.daily_readings[state.daily_readings.length - 1];
+  const staleTag = freshness === 'stale' ? '<span class="stale-tag">오래된 값</span>' : '';
+  document.getElementById('synLastGood').innerHTML =
+    (stored === null ? '—' : stored + ' ' + (lastRow ? lastRow.unit : '') + ' (' + (lastRow ? lastRow.record_date : '') + ')') + staleTag;
+
+  document.getElementById('synDelta').textContent =
+    (state.last_delta === null || state.last_delta === undefined) ? '— (비교 불가)' : '+' + state.last_delta;
+
+  replayLog.unshift(kstDateTime() + ' — ' + logLabel);
+  document.getElementById('synLog').innerHTML = replayLog.slice(0, 8).map(l => '· ' + l).join('<br>');
+}
+
+function showExpectedMatch(ok, fixture){
+  const el = document.getElementById('expectMatch');
+  el.className = 'match-flag ' + (ok ? 'ok' : 'bad');
+  el.textContent = ok
+    ? fixture.fixture_id + ' 재생 결과가 공식 fixture의 expected 값과 정확히 일치합니다.'
+    : fixture.fixture_id + ' 재생 결과가 공식 fixture의 expected 값과 다릅니다.';
+}
+
+document.getElementById('normalSeqBtn').addEventListener('click', runNormalSequence);
+document.querySelectorAll('#failurePanel .fail-buttons button[data-fx]').forEach(btn => {
+  btn.addEventListener('click', () => runFailure(btn.dataset.fx));
+});
+document.getElementById('retryBtn').addEventListener('click', retryLast);
+document.getElementById('recoverBtn').addEventListener('click', recoverD2);
+
+
+// ================= 4. 비밀값 스캔 =================
+async function scanSecrets(){
+  document.getElementById('fetchCodeBox').textContent =
+    'fetch("' + SOURCE_URL + '")\n// 쿼리 문자열: latitude, longitude, current, timezone — 인증 파라미터 없음';
+
+  const suspicious = /key|token|secret|password|auth/i;
+  const urlFlag = suspicious.test(SOURCE_URL);
+
+  let keys = [];
+  try{
+    const all = await appStorage.list('');
+    keys = all ? all.keys : [];
+  }catch(e){ keys = []; }
+  const keyFlag = keys.some(k => suspicious.test(k));
+
+  const results = document.getElementById('scanResults');
+  results.innerHTML =
+    '<div class="scan-line"><span>호출 URL에 인증/비밀 관련 문자열 포함 여부</span>' +
+      '<span class="result ' + (urlFlag ? 'fail' : 'pass') + '">' + (urlFlag ? '발견됨' : '없음') + '</span></div>' +
+    '<div class="scan-line"><span>localStorage 저장 키(' + keys.length + '건)에 비밀 관련 문자열 포함 여부</span>' +
+      '<span class="result ' + (keyFlag ? 'fail' : 'pass') + '">' + (keyFlag ? '발견됨' : '없음') + '</span></div>' +
+    '<div class="scan-line"><span>API 키 / 환경변수 사용 여부</span>' +
+      '<span class="result pass">사용하지 않음 (Open-Meteo는 무인증 공개 API)</span></div>';
+}
+
+document.getElementById('fetchBtn').addEventListener('click', fetchLive);
+
+// 초기 로드시 기존 기록/스캔 결과 표시
+renderDailyTable();
+scanSecrets();
+</script>
+</body>
+</html>
